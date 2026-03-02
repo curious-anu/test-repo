@@ -2,7 +2,8 @@ import os
 import subprocess
 import time
 from datetime import datetime
-import winsound  
+import winsound 
+import webbrowser
 
 def play_success_sound():
     winsound.Beep(1000, 300)
@@ -28,8 +29,23 @@ def handle_undo():
         subprocess.run(["git", "reset", "--soft", "HEAD~1"])
         print("✅ Last commit undone. Your files are safe but 'uncommitted'.")
 
+def get_current_branch():
+    """detects the current active branch name."""
+    try:
+        result = subprocess.run(["git", "branch", "--show-current"], capture_output=True, text=True, check=True)
+        branch = result.stdout.strip()
+        return branch if branch else "main"
+    except:
+        return "main"
+
 def smart_push_logic():
     print("\n\033[94m🚀 GitGlide: Preparing to Sync...\033[0m")
+
+    active_branch = get_current_branch()
+    print(f"📂Detected active Branch: \033[92m{active_branch}\033[0m")
+
+    branch_input = input(f"Push to '{active_branch}'? (Yes/Type branch name): ").strip()
+    target_branch = branch_input if branch_input else active_branch
     
     # Feature: Personalized Commit Message
     now = datetime.now().strftime("%Y-%m-%d %I:%M %p")
@@ -42,22 +58,22 @@ def smart_push_logic():
         subprocess.run(["git", "commit", "-m", final_msg], check=True)
         
         # Step 2: Try to Push
-        print("📡 Pushing to GitHub...")
-        result = subprocess.run(["git", "push"], capture_output=True, text=True)
+        print(f"📡 Pushing to GitHub on branch '{target_branch}'...")
+        result = subprocess.run(["git", "push", "origin", target_branch], capture_output=True, text=True)
 
         # Feature: The Auto-Healer (Conflict Resolution)
         if result.returncode != 0:
             if "rejected" in result.stderr.lower():
-                print("\n\033[93m⚠️ Conflict Detected! GitHub has updates you don't have.\033[0m")
-                print("🔄 Auto-Healer: Syncing (Rebasing) your project safely...")
+                print(f"\n\033[93m⚠️ Conflict Detected! GitHub has updates on '{target_branch}' that you don't have.\033[0m")
+                print(f"🔄 Auto-Healer: Syncing (Rebasing) {target_branch} safely...")
                 
-                sync = subprocess.run(["git", "pull", "--rebase", "origin", "main"], capture_output=True, text=True)
+                sync = subprocess.run(["git", "pull", "--rebase", "origin", target_branch], capture_output=True, text=True)
                 
                 if sync.returncode == 0:
                     print("✅ Sync Successful! Retrying push...")
-                    subprocess.run(["git", "push"])
+                    subprocess.run(["git", "push", "origin", target_branch])
                     play_success_sound()
-                    print(f"\033[92m✨ SUCCESS! Your work and GitHub's work are now merged.\033[0m")
+                    print(f"\033[92m✨ SUCCESS! Your work and GitHub's work are now merged and live!.\033[0m")
                 else:
                     print("\033[91m❌ Manual Help Needed: There is a 'Merge Conflict' in your files.\033[0m")
                     handle_undo()
@@ -66,7 +82,14 @@ def smart_push_logic():
                 handle_undo()
         else:
             play_success_sound()
-            print(f"\n\033[92m✅ SUCCESS! Project updated at {now}\033[0m")
+            print(f"\n\033[92m✅ SUCCESS!{target_branch} updated at {now}\033[0m")
+
+            open_web = input("Would you like to open the GitHub page? (y/n): ").lower()
+            if open_web == 'y':
+                url_res = subprocess.run(["git", "config", "--get", "remote.origin.url"], capture_output=True, text=True)
+                web_url = url_res.stdout.strip().replace(".git", "")
+                webbrowser.open(web_url)
+
 
     except Exception as e:
         print(f"❌ An error occurred: {e}")
