@@ -1,7 +1,7 @@
 import os
 import subprocess
 import time
-from datetime import datetime
+from datetime import datetime 
 import winsound 
 import webbrowser
 
@@ -45,7 +45,10 @@ def smart_push_logic():
     print(f"📂Detected active Branch: \033[92m{active_branch}\033[0m")
 
     branch_input = input(f"Push to '{active_branch}'? (Yes/Type branch name): ").strip()
-    target_branch = branch_input if branch_input else active_branch
+    if branch_input.lower() == 'yes' or branch_input == '':
+        target_branch = active_branch
+    else:
+        target_branch = branch_input
     
     # Feature: Personalized Commit Message
     now = datetime.now().strftime("%Y-%m-%d %I:%M %p")
