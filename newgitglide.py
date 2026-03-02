@@ -1,7 +1,7 @@
 import os
 import subprocess
 import time
-from datetime import datetime 
+from datetime import datetime
 import winsound 
 import webbrowser
 
@@ -20,17 +20,26 @@ def ensure_gitignore():
                 f.write(content)
             print("✅ .gitignore created! (Temporary files will now be ignored thus keeping your project clean)")
         else:
-            print("No problem! I will upload ever single thing.")
+            print("No problem! I will upload every single thing.")
 
 def handle_undo():
-    """Option to undo the last local commit if something went wrong."""
-    choice = input("\n\033[91m⏪ Would you like to UNDO the last commit? (y/n): \033[0m").lower()
+    """Option to undo the last local commit and clean up failed syncs/merges."""
+    choice = input("\n\033[91m⏪ Would you like to UNDO the last commit/sync? (y/n): \033[0m").lower()
     if choice == 'y':
-        subprocess.run(["git", "reset", "--soft", "HEAD~1"])
-        print("✅ Last commit undone. Your files are safe but 'uncommitted'.")
+        # 🚨 THE CLEANUP: Stops Git from being stuck in "Rebase" or "Merge" state
+        subprocess.run(["git", "rebase", "--abort"], capture_output=True)
+        subprocess.run(["git", "merge", "--abort"], capture_output=True)
+        
+        # Performs the soft reset to un-commit files
+        result = subprocess.run(["git", "reset", "--soft", "HEAD~1"], capture_output=True, text=True)
+        
+        if result.returncode == 0:
+            print("✅ Emergency Clean-up Successful! Your files are safe but 'uncommitted'.")
+        else:
+            print("💡 No commit to undo, but I've cleaned up any stuck sync states!")
 
 def get_current_branch():
-    """detects the current active branch name."""
+    """Detects the current active branch name."""
     try:
         result = subprocess.run(["git", "branch", "--show-current"], capture_output=True, text=True, check=True)
         branch = result.stdout.strip()
@@ -42,10 +51,12 @@ def smart_push_logic():
     print("\n\033[94m🚀 GitGlide: Preparing to Sync...\033[0m")
 
     active_branch = get_current_branch()
-    print(f"📂Detected active Branch: \033[92m{active_branch}\033[0m")
+    print(f"📂 Detected active Branch: \033[92m{active_branch}\033[0m")
 
-    branch_input = input(f"Push to '{active_branch}'? (Yes/Type branch name): ").strip()
-    if branch_input.lower() == 'yes' or branch_input == '':
+    branch_input = input(f"Push to '{active_branch}'? (Enter for Yes / Type branch name): ").strip().lower()
+    
+    # Smart input: if they type 'yes' or leave it blank, stay on current branch
+    if branch_input in ["", "yes", "y"]:
         target_branch = active_branch
     else:
         target_branch = branch_input
@@ -85,14 +96,13 @@ def smart_push_logic():
                 handle_undo()
         else:
             play_success_sound()
-            print(f"\n\033[92m✅ SUCCESS!{target_branch} updated at {now}\033[0m")
+            print(f"\n\033[92m✅ SUCCESS! {target_branch} updated at {now}\033[0m")
 
             open_web = input("Would you like to open the GitHub page? (y/n): ").lower()
             if open_web == 'y':
                 url_res = subprocess.run(["git", "config", "--get", "remote.origin.url"], capture_output=True, text=True)
                 web_url = url_res.stdout.strip().replace(".git", "")
                 webbrowser.open(web_url)
-
 
     except Exception as e:
         print(f"❌ An error occurred: {e}")
@@ -105,7 +115,7 @@ def setup_new_repo():
         print("❌ URL cannot be empty!")
         return
 
-    ensure_gitignore() # Check gitignore even in setup!
+    ensure_gitignore()
 
     make_readme = input("Do you want to create a README.md? (y/n): ").lower()
     if make_readme == 'y':
